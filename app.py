@@ -42,9 +42,7 @@ def login_user():
     mydb.close()
     if user is None:
         return jsonify({'status': 'error'})
-    print("goood")
     session['user_admin'] = user
-    print("goood2")
     return jsonify({'status': 'success', 'user': user})
 
 
@@ -89,6 +87,7 @@ def table_vol():
         print(data)
     cursor.execute("SELECT IDAeroport, Nom FROM Aeroport")
     arpts = cursor.fetchall()
+    print(data[0])
     cursor.close()
     mydb.close()
     return render_template('tableVol.html', data=data, arpts=arpts, user=session['user_admin'])
@@ -537,10 +536,12 @@ def welcome_page():
     pays = cursor.fetchall()
     cursor.execute("SELECT * FROM Classe")
     cls = cursor.fetchall()
+    cursor.execute(f"SELECT VL.IDVol, C.Nom , VL.PrixPlace, V.IDPays FROM Vols VL, Compagnie C, Ville V, Aeroport A WHERE A.IDVille=V.IDVille AND A.IDAeroport=VL.IDAeroportArrive AND C.IDCompagnie=VL.IDCompagnie ORDER BY (VL.IDVol) DESC LIMIT 6 ")
+    data = cursor.fetchall()
     cursor.close()
     mydb.close()
     print(session['user_client'])
-    return render_template('index.html', pays=pays, cls=cls, client=session['user_client'])
+    return render_template('index.html', pays=pays, cls=cls, data=data, client=session['user_client'])
 
 
 @app.route('/chercher-vols-client', methods=['POST'])
@@ -553,7 +554,7 @@ def chercher_vols_client():
     mydb = findConnection()
     cursor = mydb.cursor()
     req = (
-        f"SELECT VL.IDVol, C.Nom , VL.PrixPlace FROM Vols VL, Compagnie C WHERE VL.IDAeroportArrive IN (SELECT IDAeroport FROM Aeroport A, Ville V WHERE A.IDVille=V.IDVille AND V.IDPays='{paysDestination}') AND VL.IDAeroportDepart IN (SELECT IDAeroport FROM Aeroport A, Ville V WHERE A.IDVille=V.IDVille AND V.IDPays='{paysActuel}') AND `Date`='{dateDepart}'")
+        f"SELECT VL.IDVol, C.Nom , VL.PrixPlace FROM Vols VL, Compagnie C WHERE VL.IDAeroportArrive IN (SELECT IDAeroport FROM Aeroport A, Ville V WHERE A.IDVille=V.IDVille AND V.IDPays='{paysDestination}') AND VL.IDAeroportDepart IN (SELECT IDAeroport FROM Aeroport A, Ville V WHERE A.IDVille=V.IDVille AND C.IDCompagnie=VL.IDCompagnie AND V.IDPays='{paysActuel}') AND `Date`='{dateDepart}' ")
     print(req)
     cursor.execute(req)
     resultat = cursor.fetchall()
@@ -580,14 +581,16 @@ def details_reservation(id):
     cursor.execute(f"SELECT COUNT(T.NbrPlace) FROM Ticket T WHERE T.IDVol = {id}")
     nbr = cursor.fetchone()
     x = data[5] - nbr[0]
-    cursor.execute(f"SELECT A.Nom, V.Nom, P.Nom FROM Aeroport A, Ville V, Pays P WHERE A.IDAeroport = {data[6]} AND A.IDVille = V.IDVille AND V.IDPays = P.IDPays")
+    cursor.execute(
+        f"SELECT A.Nom, V.Nom, P.Nom FROM Aeroport A, Ville V, Pays P WHERE A.IDAeroport = {data[6]} AND A.IDVille = V.IDVille AND V.IDPays = P.IDPays")
     dep = cursor.fetchone()
     cursor.execute(
-        f"SELECT A.Nom, V.Nom, P.Nom FROM Aeroport A, Ville V, Pays P WHERE A.IDAeroport = {data[7]} AND A.IDVille = V.IDVille AND V.IDPays = P.IDPays")
+        f"SELECT A.Nom, V.Nom, P.Nom, P.IDPays FROM Aeroport A, Ville V, Pays P WHERE A.IDAeroport = {data[7]} AND A.IDVille = V.IDVille AND V.IDPays = P.IDPays")
     arr = cursor.fetchone()
     cursor.close()
     mydb.close()
     return render_template("details_page.html", id=id, data=data, nbr=x, arr=arr, dep=dep)
+
 
 @app.route('/login-client', methods=['GET'])
 def login_client():
@@ -595,9 +598,11 @@ def login_client():
         session['user_client'] = None
     return render_template('login.html')
 
+
 @app.route('/sign-up-client', methods=['GET'])
 def sign_up_client():
     return render_template('registration.html')
+
 
 @app.route('/login-client-action', methods=['POST'])
 def login_client_action():
@@ -639,6 +644,7 @@ def sign_up_client_action():
     mydb.close()
     return jsonify({'status': 'success'})
 
+
 @app.route('/action-reservation', methods=['POST'])
 def action_reservation():
     data = request.get_json()
@@ -650,6 +656,7 @@ def action_reservation():
     }
     return jsonify({'status': 'success'})
 
+
 @app.route('/payer-reservation', methods=['GET'])
 def payer_reservation():
     if 'reservation_en_cours' not in session or not session['reservation_en_cours']:
@@ -660,14 +667,15 @@ def payer_reservation():
     cursor = mydb.cursor()
     cursor.execute(f"SELECT PrixPlace FROM Vols WHERE IDVol = {session['reservation_en_cours']['id']}")
     prix = cursor.fetchone()
-    print(prix , session['reservation_en_cours']['nbr'])
+    print(prix, session['reservation_en_cours']['nbr'])
     cursor.close()
     mydb.close()
-    return render_template('payment_page.html', nbr=int(session['reservation_en_cours']['nbr']) , prix=prix[0],  prixT=float(prix[0]) * int(session['reservation_en_cours']['nbr']))
+    return render_template('payment_page.html', nbr=int(session['reservation_en_cours']['nbr']), prix=prix[0],
+                           prixT=float(prix[0]) * int(session['reservation_en_cours']['nbr']))
+
 
 @app.route('/payer-reservation-action', methods=['POST'])
 def payer_reservation_action():
-    print('11111')
     mydb = findConnection()
     cursor = mydb.cursor()
     cursor.execute(
@@ -678,8 +686,10 @@ def payer_reservation_action():
     cursor.close()
     mydb.close()
     session.pop('reservation_en_cours', None)
-    send_email("Confirmation de réservation", session['user_client'][3],"Bonjour,\n\nVotre réservation a été confirmée avec succès.\n\nCordialement.")
+    send_email("Confirmation de réservation", session['user_client'][3],
+               "Bonjour,\n\nVotre réservation a été confirmée avec succès.\n\nCordialement.")
     return jsonify({'status': 'success'})
+
 
 if __name__ == '__main__':
     app.run(port=8086, debug=True, host="0.0.0.0")

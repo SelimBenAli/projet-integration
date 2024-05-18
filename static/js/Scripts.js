@@ -527,7 +527,6 @@ function action_reset(id) {
 
 
 function chercher_vols_client() {
-    console.log('eeeeeeeeee')
     paysActuel = document.getElementById('loacl-voyage').value;
     dateDepart = document.getElementById('depart-voyage').value;
 
@@ -565,7 +564,7 @@ function load_given_data_client_search(data, r) {
         search_container.innerHTML += `
                 <div class="col-md-4 col-sm-6">
                             <div class="single-package-item">
-                                <img src="./images/villes/1.jpg" alt="package-place">
+                            <img src="./static/destination/${r[0]}.jpg" alt="package-place">
                                 <div class="single-package-item-txt">
                                     <h3>${r[1]} <span class="pull-right">${element[2]} TND</span></h3>
                                     <div class="packages-para">
